@@ -45,6 +45,7 @@
       background: rgba(0,0,0,0.3);
       padding: 8px 16px;
       border-radius: 20px;
+      z-index: 1000;
     }
 
     .card-stack {
@@ -145,24 +146,39 @@
       bottom: 0;
       left: 0;
       right: 0;
-      padding: 15px;
+      padding: 10px 15px;  
       background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
       color: white;
       border-bottom-left-radius: 20px;
       border-bottom-right-radius: 20px;
+      text-align: center;  
     }
-
-    .car-name {
+    
+    .item-name {
       font-weight: bold;
       font-size: 18px;
       margin-bottom: 5px;
     }
 
-    .car-details {
-      font-size: 14px;
-      opacity: 0.8;
+    .item-details {
+      font-size: 16px;  
+      opacity: 0.9;     
+      font-weight: 500; 
     }
-
+    
+    .api-source {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 10;
+    }
+    
     .loading-progress {
       position: absolute;
       bottom: 10px;
@@ -228,407 +244,354 @@
   </div>
   
   <div id="apiStatus" style="margin-top: 15px; font-size: 14px; opacity: 0.7; text-align: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 15px;">
-    Using multiple APIs: Unsplash, Pixabay, and Lorem Picsum
+    Using multiple API sources for maximum reliability
   </div>
 
-  <script>
-    // Configuration
-    const PRELOAD_RANGE = 2;
-    const VISIBLE_RANGE = 3;
-    const INITIAL_CARD_COUNT = 20;
-    
-    // Car brands and models for random generation
-    const CAR_BRANDS = [
-      "Ferrari", "Lamborghini", "Porsche", "McLaren", "Bugatti", "Aston Martin",
-      "BMW", "Mercedes-Benz", "Audi", "Toyota", "Honda", "Ford", "Chevrolet",
-      "Nissan", "Tesla", "Jaguar", "Lexus", "Maserati", "Bentley", "Rolls-Royce"
-    ];
-    
-    const CAR_MODELS = {
-      "Ferrari": ["F8 Tributo", "812 Superfast", "Roma", "SF90 Stradale", "Portofino"],
-      "Lamborghini": ["Aventador", "Huracán", "Urus", "Sián", "Revuelto"],
-      "Porsche": ["911", "Taycan", "Panamera", "Cayenne", "Macan"],
-      "McLaren": ["720S", "Artura", "GT", "Elva", "Speedtail"],
-      "Bugatti": ["Chiron", "Veyron", "Divo", "La Voiture Noire", "Centodieci"],
-      "Aston Martin": ["DB11", "Vantage", "DBS Superleggera", "Valkyrie", "DBX"],
-      "BMW": ["M3", "M5", "X5", "i8", "8 Series"],
-      "Mercedes-Benz": ["S-Class", "E-Class", "G-Wagon", "AMG GT", "EQS"],
-      "Audi": ["R8", "RS6", "Q8", "e-tron GT", "A8"],
-      "Toyota": ["Supra", "GR Yaris", "Land Cruiser", "Century", "Crown"],
-      "Honda": ["NSX", "Civic Type R", "S2000", "Prelude", "Integra"],
-      "Ford": ["Mustang", "GT", "Raptor", "Bronco", "Shelby GT500"],
-      "Chevrolet": ["Corvette", "Camaro", "Silverado", "Suburban", "Tahoe"],
-      "Nissan": ["GT-R", "Z", "Skyline", "Ariya", "Patrol"],
-      "Tesla": ["Model S", "Model 3", "Model X", "Model Y", "Cybertruck"],
-      "Jaguar": ["F-Type", "I-Pace", "XJ", "F-Pace", "XF"],
-      "Lexus": ["LFA", "LC 500", "LS", "RX", "IS"],
-      "Maserati": ["MC20", "Ghibli", "Levante", "Quattroporte", "GranTurismo"],
-      "Bentley": ["Continental GT", "Bentayga", "Flying Spur", "Bacalar", "Mulliner"],
-      "Rolls-Royce": ["Phantom", "Ghost", "Cullinan", "Wraith", "Dawn"]
-    };
-    
-    // Car years range
-    const MIN_YEAR = 2018;
-    const MAX_YEAR = 2025;
-    
-    // Image dimensions for Unsplash API
-    const WIDTH = 3840;
-    const HEIGHT = 2160;
-    
-    class MediaLoader {
-      constructor() {
-        this.loadQueue = new Set();
-        this.loading = new Set();
-        this.loaded = new Set();
-        this.maxConcurrent = 3;
-      }
+<script>
+  const WIDTH = 1920;
+  const HEIGHT = 1080;
+  const INITIAL_CARD_COUNT = 20;
+  const PRELOAD_RANGE = 2;
+  const VISIBLE_RANGE = 3;
+  const USED_URLS = new Set();
 
-      addToQueue(card) {
-        if (this.loaded.has(card) || this.loading.has(card) || this.loadQueue.has(card)) return;
-        this.loadQueue.add(card);
-        this.processQueue();
-      }
+  const SEARCH_TOPICS = [
+    "nature", "cinema", "space", "technology", "architecture",
+    "fantasy", "mythology", "abstract", "ocean", "travel",
+    "landscape", "art", "galaxy", "urban", "vintage",
+    "wildlife", "dreamscape", "sci-fi", "mountains", "sunset",
+    "surrealism", "minimalist", "cyberpunk", "historical", "future"
+  ];
 
-      processQueue() {
-        if (this.loading.size >= this.maxConcurrent) return;
-        
-        for (const card of this.loadQueue) {
-          if (this.loading.size >= this.maxConcurrent) break;
-          
-          this.loadQueue.delete(card);
-          this.loading.add(card);
-          
-          const img = card.querySelector('img');
-          if (!img || !img.dataset.src) {
-            this.loading.delete(card);
-            continue;
-          }
+  // API source configurations with names for display
+  const API_SOURCES = [
+    {
+      name: "Unsplash",
+      url: `https://source.unsplash.com/random/${WIDTH}x${HEIGHT}/?{query}`,
+      type: "direct"
+    },
+    {
+      name: "Random.ImageCDN",
+      url: `https://random.imagecdn.app/${WIDTH}/${HEIGHT}`,
+      type: "direct"
+    },
+    {
+      name: "Picsum Photos",
+      url: `https://picsum.photos/${WIDTH}/${HEIGHT}?random={rand}`,
+      type: "direct"
+    },
+    {
+      name: "Pexels API",
+      type: "pexels"
+    }
+  ];
 
-          // Create and update progress display
-          let progress = card.querySelector('.loading-progress');
-          if (!progress) {
-            progress = document.createElement('div');
-            progress.className = 'loading-progress';
-            card.appendChild(progress);
-          }
-          progress.textContent = 'Loading...';
-
-          img.onload = () => this.handleLoad(card);
-          img.onerror = () => this.handleError(card);
-          img.src = img.dataset.src;
-          delete img.dataset.src;
+  // Add the authorization header with your Pexels API key
+  async function getPexelsImage(query) {
+    try {
+      const apiKey = "XXqDuusTgtQEwHvbO0JbuNRRWgMBnncTwbRfEWt8gE7VqjNEllez2AgX"; // Replace with actual key
+      const response = await fetch(`https://api.pexels.com/v1/search?query=${query}&per_page=1&page=${Math.floor(Math.random() * 20) + 1}`, {
+        headers: {
+          Authorization: apiKey
         }
-      }
-
-      handleLoad(card) {
-        this.loading.delete(card);
-        this.loaded.add(card);
-        card.classList.remove('loading');
-        const progress = card.querySelector('.loading-progress');
-        if (progress) {
-          progress.remove();
-        }
-        this.processQueue();
-      }
-
-      handleError(card) {
-        this.loading.delete(card);
-        
-        // Try with a different image source on error
-        const img = card.querySelector('img');
-        const car = JSON.parse(card.dataset.car);
-        
-        // If it's a Pixabay JSON response that failed to load as an image
-        if (img.src.includes('pixabay.com/api')) {
-          // Fetch the actual image from the Pixabay API response
-          fetch(img.src)
-            .then(response => response.json())
-            .then(data => {
-              if (data && data.hits && data.hits.length > 0) {
-                img.src = data.hits[0].webformatURL;
-              } else {
-                // Fallback to Picsum if no results
-                img.src = `https://picsum.photos/${WIDTH}/${HEIGHT}?random=${Math.random()}`;
-              }
-            })
-            .catch(() => {
-              // Ultimate fallback
-              img.src = '/api/placeholder/800/600';
-            });
-        } else {
-          // Try with Lorem Picsum as a reliable fallback
-          img.src = `https://picsum.photos/${WIDTH}/${HEIGHT}?random=${Math.random()}`;
-        }
-        
-        const progress = card.querySelector('.loading-progress');
-        if (progress) {
-          progress.textContent = 'Trying alternate source...';
-          setTimeout(() => {
-            if (card.contains(progress)) {
-              progress.remove();
-            }
-          }, 2000);
-        }
-        
-        // Don't mark as loaded until the fallback completes successfully
-        img.onload = () => {
-          card.classList.remove('loading');
-          this.loaded.add(card);
-          this.processQueue();
-        };
-      }
-
-      prioritize(cards) {
-        for (const card of this.loadQueue) {
-          if (!cards.includes(card)) {
-            this.loadQueue.delete(card);
-          }
-        }
-        cards.forEach(card => this.addToQueue(card));
-      }
-    }
-
-    const mediaLoader = new MediaLoader();
-    
-    // Generate random car data
-    function generateRandomCar() {
-      const brand = CAR_BRANDS[Math.floor(Math.random() * CAR_BRANDS.length)];
-      const model = CAR_MODELS[brand][Math.floor(Math.random() * CAR_MODELS[brand].length)];
-      const year = Math.floor(Math.random() * (MAX_YEAR - MIN_YEAR + 1)) + MIN_YEAR;
-      
-      // Generate a query that will likely return a car image
-      const searchTerm = `${year} ${brand} ${model}`;
-      
-      return {
-        brand,
-        model,
-        year,
-        searchTerm
-      };
-    }
-    
-    // Get image URL from multiple sources for a car
-    function getCarImageUrl(car) {
-      // Use multiple APIs to get car images
-      const apis = [
-        // Unsplash Source API
-        `https://source.unsplash.com/random/${WIDTH}x${HEIGHT}/?${encodeURIComponent(car.searchTerm)}`,
-        
-        // Pixabay API (doesn't require authentication for this endpoint)
-        `https://pixabay.com/api/?key=pixabay_api_demo&q=${encodeURIComponent(car.searchTerm)}&image_type=photo&orientation=horizontal&min_width=${WIDTH}&min_height=${HEIGHT}&per_page=3`,
-        
-        // Use Lorem Picsum as a reliable fallback for random images
-        `https://picsum.photos/${WIDTH}/${HEIGHT}?random=${Math.random()}`
-      ];
-      
-      // Select API randomly for variety and to distribute load
-      return apis[Math.floor(Math.random() * apis.length)];
-    }
-    
-    const cardStack = document.getElementById('cardStack');
-    const cards = [];
-    let currentIndex = 0;
-    
-    // Function to safely retry with a different API if one fails
-    function switchImageAPI(img, car) {
-      // Try a different API method
-      const methods = [
-        // Direct Unsplash method
-        `https://source.unsplash.com/random/${WIDTH}x${HEIGHT}/?${encodeURIComponent(car.searchTerm)}`,
-        
-        // Direct Lorem Picsum method (completely reliable fallback)
-        `https://picsum.photos/${WIDTH}/${HEIGHT}?random=${Math.random()}`
-      ];
-      
-      // Pick a method we haven't tried yet
-      const usedMethod = img.dataset.usedMethod || 0;
-      const newMethod = (parseInt(usedMethod) + 1) % methods.length;
-      img.dataset.usedMethod = newMethod;
-      
-      return methods[newMethod];
-    }
-    
-    // Create initial set of cards
-    function createCards(count) {
-      for (let i = 0; i < count; i++) {
-        const car = generateRandomCar();
-        const card = document.createElement('div');
-        card.className = 'card loading';
-        card.dataset.car = JSON.stringify(car);
-        
-        // Add loader spinner
-        const loader = document.createElement('div');
-        loader.className = 'loader';
-        card.appendChild(loader);
-        
-        // Create image element
-        const img = document.createElement('img');
-        img.alt = `Car image`;
-        img.dataset.src = getCarImageUrl(car);
-        img.dataset.usedMethod = "0"; // Track which API we've tried
-        
-        // Add backup error handler before initial load
-        img.onerror = function() {
-          this.src = switchImageAPI(this, car);
-        };
-        
-        card.appendChild(img);
-        
-        cardStack.appendChild(card);
-        cards.push(card);
-      }
-      
-      updateCardsPosition();
-    }
-    
-    // Add more cards
-    function addMoreCards(count) {
-      const startIndex = cards.length;
-      createCards(count);
-      return startIndex;
-    }
-    
-    let startX = 0;
-    let currentX = 0;
-    let isDragging = false;
-    let animationFrame = null;
-    
-    const updateCardsPosition = (offset = 0) => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-      
-      animationFrame = requestAnimationFrame(() => {
-        const start = Math.max(0, currentIndex - VISIBLE_RANGE);
-        const end = Math.min(cards.length, currentIndex + VISIBLE_RANGE + 1);
-        const preloadStart = Math.max(0, currentIndex - PRELOAD_RANGE);
-        const preloadEnd = Math.min(cards.length, currentIndex + PRELOAD_RANGE + 1);
-        
-        const priorityCards = cards.slice(preloadStart, preloadEnd);
-        mediaLoader.prioritize(priorityCards);
-        
-        cards.forEach((card, index) => {
-          if (index < start || index > end) {
-            card.style.visibility = 'hidden';
-            card.classList.remove('visible');
-            return;
-          }
-          
-          const distance = index - currentIndex;
-          let x = 0;
-          let scale = 1;
-          let rotation = 0;
-          let zIndex = cards.length - Math.abs(distance);
-          
-          if (distance === 0) {
-            x = offset;
-            scale = 1;
-            rotation = offset * 0.05;
-          } else if (distance > 0) {
-            x = 40 + (distance - 1) * 10;
-            scale = 0.95 - (distance - 1) * 0.05;
-            rotation = 3;
-          } else {
-            x = -40 + (distance + 1) * 10;
-            scale = 0.95 + (distance + 1) * 0.05;
-            rotation = -3;
-          }
-          
-          card.style.visibility = 'visible';
-          card.style.transform = `translateX(${x}px) scale(${scale}) rotate(${rotation}deg)`;
-          card.style.zIndex = zIndex;
-          card.classList.add('visible');
-        });
       });
-    };
+      
+      if (!response.ok) {
+        throw new Error("Pexels API error");
+      }
+
+      const data = await response.json();
+      if (data.photos && data.photos.length > 0) {
+        return { url: data.photos[0].src.large2x, source: "Pexels API" };
+      }
+      throw new Error("No images found");
+    } catch (error) {
+      console.error("Pexels API error:", error);
+      throw error;
+    }
+  }
+
+  function generateRandomItem() {
+    const year = Math.floor(Math.random() * (2025 - 2000 + 1)) + 2000;
+    const query = SEARCH_TOPICS[Math.floor(Math.random() * SEARCH_TOPICS.length)];
+    return { year, query };
+  }
+
+  // Function to cycle through API sources
+  let lastApiIndex = -1;
+  
+  async function resolveImageUrl(item) {
+    let attempts = 0;
     
-    let lastDragTime = 0;
-    const dragThrottle = 16;
-    
-    const handleStart = (e) => {
-      if (currentIndex < 0 || currentIndex >= cards.length) return;
-      isDragging = true;
-      startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
-      currentX = startX;
+    // Cycle through all APIs one by one
+    while (attempts < API_SOURCES.length * 2) {
+      lastApiIndex = (lastApiIndex + 1) % API_SOURCES.length;
+      const apiSource = API_SOURCES[lastApiIndex];
+      const rand = Math.floor(Math.random() * 100000);
       
-      cards[currentIndex].classList.add('dragging');
-      document.querySelector('.hint').style.opacity = '0';
-    };
-    
-    const handleMove = (e) => {
-      if (!isDragging) return;
-      e.preventDefault();
-      
-      const now = Date.now();
-      if (now - lastDragTime < dragThrottle) return;
-      
-      lastDragTime = now;
-      currentX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
-      const diff = currentX - startX;
-      
-      updateCardsPosition(diff);
-    };
-    
-    const handleEnd = () => {
-      if (!isDragging) return;
-      isDragging = false;
-      
-      const currentCard = cards[currentIndex];
-      currentCard.classList.remove('dragging');
-      
-      const diff = currentX - startX;
-      const threshold = 100;
-      
-      if (Math.abs(diff) > threshold) {
-        currentIndex += diff > 0 ? -1 : 1;
-        currentIndex = Math.max(0, Math.min(currentIndex, cards.length - 1));
-        
-        // If nearing the end, add more cards
-        if (currentIndex >= cards.length - 5) {
-          addMoreCards(10);
+      try {
+        if (apiSource.type === "pexels") {
+          // Use Pexels API
+          const result = await getPexelsImage(item.query);
+          if (!USED_URLS.has(result.url)) {
+            USED_URLS.add(result.url);
+            return { url: result.url, source: result.source };
+          }
+        } else {
+          // Direct URL construction
+          let url = apiSource.url
+            .replace("{width}", WIDTH)
+            .replace("{height}", HEIGHT)
+            .replace("{query}", encodeURIComponent(item.query))
+            .replace("{rand}", rand);
+          
+          if (!USED_URLS.has(url)) {
+            USED_URLS.add(url);
+            return { url, source: apiSource.name };
+          }
         }
+      } catch (error) {
+        console.log(`Error with ${apiSource.name}:`, error);
       }
       
-      updateCardsPosition(0);
-    };
-    
-    // Navigation buttons
-    document.getElementById('prevBtn').addEventListener('click', () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        updateCardsPosition(0);
+      attempts++;
+    }
+
+    // Fallback to Picsum Photos if all else fails
+    const fallbackUrl = `https://picsum.photos/${WIDTH}/${HEIGHT}?fallback=${Date.now()}`;
+    return { url: fallbackUrl, source: "Picsum (Fallback)" };
+  }
+
+  class MediaLoader {
+    constructor() {
+      this.queue = new Set();
+      this.loading = new Set();
+      this.loaded = new Set();
+    }
+
+    async loadCard(card) {
+      const img = card.querySelector("img");
+      const item = JSON.parse(card.dataset.item);
+      card.classList.add("loading");
+      
+      try {
+        const result = await resolveImageUrl(item);
+        img.onload = () => this.onLoad(card, result.source);
+        img.onerror = () => this.onError(card, item);
+        img.src = result.url;
+        card.dataset.source = result.source;
+      } catch (error) {
+        this.onError(card, item);
       }
-    });
+    }
+
+    onLoad(card, source) {
+      this.loading.delete(card);
+      this.loaded.add(card);
+      card.classList.remove("loading");
+      
+      const progress = card.querySelector(".loading-progress");
+      if (progress) progress.remove();
+      
+      // Show API source and info
+      this.showInfo(card);
+      this.showApiSource(card, source);
+
+      // Smooth fade-in effect
+      card.querySelector("img").style.opacity = 1;
+    }
+
+    onError(card, item) {
+      this.loading.delete(card);
+      card.classList.add("loading");
+      
+      // Try another source on error
+      setTimeout(() => {
+        resolveImageUrl(item).then(result => {
+          const img = card.querySelector("img");
+          img.src = result.url;
+          card.dataset.source = result.source;
+        });
+      }, 500);
+    }
+
+    showInfo(card) {
+      if (card.querySelector(".card-info")) return;
+      const item = JSON.parse(card.dataset.item);
+      const div = document.createElement("div");
+      div.className = "card-info";
+      div.innerHTML = `<div class="item-name">${item.query}</div>
+                      <div class="item-details">${item.year}</div>`;
+      card.appendChild(div);
+    }
     
-    document.getElementById('nextBtn').addEventListener('click', () => {
-      if (currentIndex < cards.length - 1) {
-        currentIndex++;
-        updateCardsPosition(0);
-        
-        // If nearing the end, add more cards
-        if (currentIndex >= cards.length - 5) {
-          addMoreCards(10);
+    showApiSource(card, source) {
+      if (card.querySelector(".api-source")) return;
+      const div = document.createElement("div");
+      div.className = "api-source";
+      div.textContent = source || card.dataset.source || "Unknown Source";
+      card.appendChild(div);
+    }
+
+    prioritize(cards) {
+      cards.forEach(card => {
+        if (!this.loading.has(card) && !this.loaded.has(card)) {
+          this.loading.add(card);
+          this.loadCard(card);
         }
+      });
+    }
+  }
+
+  const mediaLoader = new MediaLoader();
+  const cardStack = document.getElementById("cardStack");
+  const cards = [];
+  let currentIndex = 0;
+
+  // Intersection Observer for lazy loading
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const card = entry.target;
+        mediaLoader.loadCard(card);
+        observer.unobserve(card);
       }
     });
-    
-    document.getElementById('reloadBtn').addEventListener('click', () => {
-      const newIndex = addMoreCards(10);
-      currentIndex = newIndex;
-      updateCardsPosition(0);
+  }, {
+    rootMargin: '0px 0px 300px 0px',  // Trigger when image is close to view
+  });
+
+  function createCards(count) {
+    for (let i = 0; i < count; i++) {
+      const item = generateRandomItem();
+      const card = document.createElement("div");
+      card.className = "card loading";
+      card.dataset.item = JSON.stringify(item);
+
+      card.innerHTML = `
+        <div class="loader"></div>
+        <img alt="${item.query} image" style="opacity: 0;" />
+        <div class="loading-progress">Loading...</div>
+      `;
+
+      cardStack.appendChild(card);
+      cards.push(card);
+
+      observer.observe(card);  // Start observing each card for lazy loading
+    }
+
+    updateCardsPosition();
+  }
+
+  function updateCardsPosition(offset = 0) {
+    const start = Math.max(0, currentIndex - VISIBLE_RANGE);
+    const end = Math.min(cards.length, currentIndex + VISIBLE_RANGE + 1);
+    const preloadStart = Math.max(0, currentIndex - PRELOAD_RANGE);
+    const preloadEnd = Math.min(cards.length, currentIndex + PRELOAD_RANGE * 2);
+
+    const preload = cards.slice(preloadStart, preloadEnd);
+    mediaLoader.prioritize(preload);
+
+    cards.forEach((card, index) => {
+      if (index < start || index > end) {
+        card.style.visibility = "hidden";
+        card.classList.remove("visible");
+        return;
+      }
+
+      const distance = index - currentIndex;
+      let x = 0, scale = 1, rotation = 0;
+      let zIndex = cards.length - Math.abs(distance);
+
+      if (distance === 0) {
+        x = offset;
+        rotation = offset * 0.05;
+      } else if (distance > 0) {
+        x = 40 + (distance - 1) * 10;
+        scale = 0.95 - (distance - 1) * 0.05;
+        rotation = 3;
+      } else {
+        x = -40 + (distance + 1) * 10;
+        scale = 0.95 + (distance + 1) * 0.05;
+        rotation = -3;
+      }
+
+      card.style.visibility = "visible";
+      card.style.transform = `translateX(${x}px) scale(${scale}) rotate(${rotation}deg)`;
+      card.style.zIndex = zIndex;
+      card.classList.add("visible");
     });
-    
-    // Event listeners for dragging
-    cardStack.addEventListener('mousedown', handleStart, { passive: true });
-    cardStack.addEventListener('mousemove', handleMove);
-    cardStack.addEventListener('mouseup', handleEnd);
-    cardStack.addEventListener('mouseleave', handleEnd);
-    cardStack.addEventListener('touchstart', handleStart, { passive: true });
-    cardStack.addEventListener('touchmove', handleMove);
-    cardStack.addEventListener('touchend', handleEnd);
-    
-    // Initialize
-    createCards(INITIAL_CARD_COUNT);
-  </script>
+  }
+
+  // Swipe logic
+  let startX = 0, currentX = 0, isDragging = false;
+  const hint = document.querySelector(".hint");
+
+  function handleStart(e) {
+    isDragging = true;
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    hint.style.opacity = "0";
+  }
+
+  function handleMove(e) {
+    if (!isDragging) return;
+    currentX = e.touches ? e.touches[0].clientX : e.clientX;
+    const offset = currentX - startX;
+    updateCardsPosition(offset);
+  }
+
+  function handleEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    const offset = currentX - startX;
+    const threshold = window.innerWidth * 0.15;
+
+    if (Math.abs(offset) > threshold) {
+      currentIndex += offset < 0 ? 1 : -1;
+      currentIndex = Math.max(0, Math.min(cards.length - 1, currentIndex));
+      if (currentIndex >= cards.length - 5) createCards(10);
+    }
+
+    updateCardsPosition();
+  }
+
+  cardStack.addEventListener("mousedown", handleStart);
+  cardStack.addEventListener("touchstart", handleStart, { passive: true });
+  window.addEventListener("mousemove", handleMove);
+  window.addEventListener("touchmove", handleMove);
+  window.addEventListener("mouseup", handleEnd);
+  window.addEventListener("touchend", handleEnd);
+
+  // Buttons
+  document.getElementById("prevBtn").addEventListener("click", () => {
+    if (currentIndex > 0) currentIndex--;
+    updateCardsPosition();
+  });
+
+  document.getElementById("nextBtn").addEventListener("click", () => {
+    if (currentIndex < cards.length - 1) {
+      currentIndex++;
+      if (currentIndex >= cards.length - 5) createCards(10);
+    }
+    updateCardsPosition();
+  });
+
+  document.getElementById("reloadBtn").addEventListener("click", () => {
+    const newIndex = cards.length;
+    createCards(10);
+    currentIndex = newIndex;
+    updateCardsPosition();
+  });
+
+  // Update API status text
+  setInterval(() => {
+    const apiStatus = document.getElementById("apiStatus");
+    const activeSources = API_SOURCES.map(s => s.name).join(", ");
+    apiStatus.textContent = `Active sources: ${activeSources}`;
+  }, 5000);
+
+  createCards(INITIAL_CARD_COUNT);
+</script>
+
 </body>
 </html>
